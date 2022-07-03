@@ -1,0 +1,13 @@
+.btn {
+	@apply border-2 border-solid rounded-full border-primary;
+	@apply text-base font-normal uppercase;
+	@apply px-[1.5em] py-[0.6em];
+}
+
+.btn--large {
+	@apply text-2xl;
+}
+
+.btn--solid {
+	@apply text-background bg-primary;
+}

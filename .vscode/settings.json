@@ -6,6 +6,7 @@
         "source.fixAll.prettier": true
     },
     "cSpell.words": [
+        "cloin",
         "Openlogin",
         "Postgrest",
         "sonarjs",

@@ -1,5 +1,6 @@
-import { Account, validate } from "../domain/account";
-import { AccountDSO } from "../dso/account.dso";
+import type { Account } from "../domain/account";
+import { validate } from "../domain/account";
+import type { AccountDSO } from "../dso/account.dso";
 
 const dsoToDomain = (dso: AccountDSO): Account => {
 	const account: Account = {
@@ -14,8 +15,8 @@ const dsoToDomain = (dso: AccountDSO): Account => {
 			chain: dso.wallet_chain,
 			chainId: dso.wallet_chain_id,
 		},
-		createdAt: new Date(dso.created_at),
-		updatedAt: new Date(dso.updated_at),
+		createdAt: dso.created_at,
+		updatedAt: dso.updated_at,
 	};
 
 	validate(account);
@@ -35,8 +36,8 @@ const domainToDso = (account: Account): AccountDSO => {
 		wallet_address: account.wallet.address,
 		wallet_chain: account.wallet.chain,
 		wallet_chain_id: account.wallet.chainId,
-		created_at: account.createdAt.toISOString(),
-		updated_at: account.updatedAt.toISOString(),
+		created_at: account.createdAt,
+		updated_at: account.updatedAt,
 	};
 
 	return dso;

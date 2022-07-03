@@ -12,6 +12,17 @@ import { WEB3AUTH_CHAIN_CONFIG } from "../config";
 import { getWalletProvider } from "./wallet-provider";
 import { ADAPTER_EVENTS } from "@web3auth/base";
 import { toast } from "services/toast/toast";
+import { request } from "@utils/request";
+import Router from "next/router";
+import axios from "axios";
+import type { GetAccountExistsByWalletAddressResponse } from "@modules/account/usecases/get-account-exists-by-wallet-address";
+import { isBoolean } from "@utils/types/is-nothing";
+import type { AddAccountResponse } from "@modules/account/usecases/add-account";
+import type { Account } from "@modules/account/domain/account";
+import { v4 as uuidV4 } from "uuid";
+import type { GetAccountByWalletAddressResponse } from "@modules/account/usecases/get-account-by-wallet-address";
+import type { Profile } from "@modules/account/domain/profile";
+import type { GetProfileByAccountReferenceResponse } from "@modules/account/usecases/get-profile-by-account-reference";
 
 interface IWeb3AuthContext {
 	web3Auth: Nullable<Web3Auth>;
@@ -19,8 +30,14 @@ interface IWeb3AuthContext {
 	chain: Nullable<string>;
 	network: Nullable<string>;
 	user: User;
+
 	connectionStatus: "DISCONNECTED" | "CONNECTING" | "CONNECTED";
 	isLoading: boolean;
+
+	account: Nullable<Account>;
+	profile: Nullable<Profile>;
+	setProfile: (profile: Profile) => void;
+
 	login: () => Promise<void>;
 	logout: () => Promise<void>;
 	getUserInfo: () => Promise<Result<Partial<User>>>;
@@ -37,6 +54,9 @@ const initialState: IWeb3AuthContext = {
 	user: null,
 	connectionStatus: "DISCONNECTED",
 	isLoading: false,
+	account: null,
+	profile: null,
+	setProfile: (profile: Profile) => {},
 	login: async () => {},
 	logout: async () => {},
 	getUserInfo: async () => fail(new Error("No provider selected yet")),
@@ -63,11 +83,17 @@ export const Web3AuthProvider = ({
 	const [isLoading, setIsLoading] = useState<IWeb3AuthContext["isLoading"]>(false);
 	const [user, setUser] = useState<IWeb3AuthContext["user"]>(null);
 	const [provider, setProvider] = useState<IWeb3AuthContext["provider"]>(null);
+	const [account, setAccount] = useState<IWeb3AuthContext["account"]>(null);
+	const [profile, setProfile] = useState<IWeb3AuthContext["profile"]>(null);
 
 	const setWalletProvider = useCallback(
 		(web3authProvider: SafeEventEmitterProvider) => {
 			getWalletProvider({ chain, provider: web3authProvider }).match({
-				ok: (result) => setProvider(result),
+				ok: (result) => {
+					console.log({ result });
+					setProvider(result);
+					console.log({ didItSet: provider });
+				},
 				fail: (err) => {
 					toast.error(err.message);
 					setProvider(null);
@@ -82,6 +108,7 @@ export const Web3AuthProvider = ({
 		setIsLoading(false);
 		setUser(null);
 		setProvider(null);
+		setAccount(null);
 	};
 
 	useEffect(() => {
@@ -125,9 +152,8 @@ export const Web3AuthProvider = ({
 
 				setIsLoading(true);
 
-				// const clientId = process.env.NEXT_PUBLIC_WEB3AUTH_CLIENT_ID;
-				// if (!clientId) throw new Error("ClientId environmental variable is missing.");
-				const clientId = "1234";
+				const clientId = process.env.NEXT_PUBLIC_WEB3AUTH_CLIENT_ID;
+				if (!clientId) throw new Error("ClientId environmental variable is missing.");
 
 				const adapter = new OpenloginAdapter({
 					adapterSettings: { network: web3AuthNetwork, clientId },
@@ -155,18 +181,106 @@ export const Web3AuthProvider = ({
 	}, [web3AuthNetwork, chain, setWalletProvider]);
 
 	const login = async () => {
-		if (!web3Auth) {
-			console.log("Cannot log in before Web3Auth initializes.");
-			return;
-		}
+		try {
+			// STEP 1: Log in with Web3Auth
+			if (!web3Auth) throw new Error("Cannot log in before Web3Auth initializes.");
 
-		const localProvider = await web3Auth.connect();
-		if (!localProvider) {
-			toast.error("Was not able to connect to login provider.");
-			return;
-		}
+			const localProvider = await web3Auth.connect();
+			if (!localProvider) {
+				throw new Error("Was not able to connect to login provider.");
+			}
 
-		setWalletProvider(localProvider);
+			setWalletProvider(localProvider);
+
+			// STEP 2: See if account with associated login's wallet address exists in DB
+			const loginProvider = getWalletProvider({ chain, provider: localProvider }).match({
+				ok: (result) => result,
+				fail: (error) => {
+					throw new Error(error.message);
+				},
+			});
+
+			const address = (await loginProvider.getAccounts()).match({
+				ok: (accounts) => {
+					if (!accounts[0]) throw new Error("No wallet addresses found");
+
+					return accounts[0];
+				},
+				fail: (error) => {
+					throw new Error(error.message);
+				},
+			});
+
+			const account = await axios
+				.get<GetAccountByWalletAddressResponse>(`/api/account/wallet-address/${address}`)
+				.then((response) => response.data?.data)
+				.catch((err) => {
+					throw new Error(err);
+				});
+
+			// STEP 3: If account exists already in DB, load account.
+			console.log({ account });
+			if (account?.id) {
+				setAccount(account);
+
+				const profileResult = await axios
+					.get<GetProfileByAccountReferenceResponse>(`/api/account/${account.id}/profile`)
+					.then((response) => response.data.data)
+					.catch((err) => {
+						throw new Error(err);
+					});
+
+				if (profileResult) {
+					setProfile(profileResult);
+				}
+
+				return;
+			} // TODO: populate account info here.
+
+			// STEP 4: If account doesn't exist, add to DB
+			const accountInfo = await web3Auth.getUserInfo();
+			const chainId = (await loginProvider.getChainId()).unwrapOrElse((err) => {
+				throw new Error(err.message);
+			});
+
+			const newAccount: Account = {
+				id: uuidV4(),
+				provider: {
+					usesProvider: Boolean(accountInfo.typeOfLogin),
+					...(accountInfo.typeOfLogin && { type: accountInfo.typeOfLogin }),
+					...(accountInfo.email && { email: accountInfo.email }),
+				},
+				wallet: {
+					address,
+					chain,
+					chainId,
+				},
+				createdAt: new Date().toISOString(),
+				updatedAt: new Date().toISOString(),
+			};
+			console.log({ newAccount });
+			const createdAccount = await axios
+				.post<AddAccountResponse>("/api/account/create", newAccount)
+				.then((response) => {
+					if (response.data.account) return response.data.account;
+
+					throw new Error("Cannot verify new account creation. Try logging back in.");
+				})
+				.catch((err) => {
+					console.error(err);
+					throw new Error("Failed to create new account.");
+				});
+
+			console.log({ createdAccount });
+
+			setAccount(createdAccount);
+
+			// STEP 5: If account was added, go to join page.
+			Router.push("/account");
+		} catch (err) {
+			console.error(err);
+			toast.error("Was not able to complete login.");
+		}
 	};
 
 	const logout = async () => {
@@ -217,6 +331,9 @@ export const Web3AuthProvider = ({
 				user,
 				connectionStatus,
 				isLoading,
+				account,
+				profile,
+				setProfile,
 				login,
 				logout,
 				getUserInfo,

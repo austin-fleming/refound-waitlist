@@ -13,6 +13,7 @@ is printing their values to the screen.
 export interface IWalletProvider {
 	getAccounts: () => Promise<Result<string[]>>;
 	getBalance: () => Promise<Result<string>>;
+	getChainId: () => Promise<Result<number>>;
 	signMessage: (message: string) => Promise<Result<any>>;
 }
 
@@ -38,6 +39,17 @@ export const evmProvider = (provider: SafeEventEmitterProvider): IWalletProvider
 		} catch (err) {
 			console.error(err);
 			return fail(new Error("Could not get balance"));
+		}
+	};
+
+	const getChainId: IWalletProvider["getChainId"] = async () => {
+		try {
+			const web3 = new Web3(provider as any);
+			const chainId = await web3.eth.getChainId();
+			return ok(chainId);
+		} catch (err) {
+			console.error(err);
+			return fail(new Error("Could not get chain id"));
 		}
 	};
 
@@ -74,6 +86,7 @@ export const evmProvider = (provider: SafeEventEmitterProvider): IWalletProvider
 	return {
 		getAccounts,
 		getBalance,
+		getChainId,
 		signMessage,
 	};
 };
@@ -88,6 +101,5 @@ export const getWalletProvider = ({
 	if (chain === "polygon") {
 		return ok(evmProvider(provider));
 	}
-
 	return fail(new Error(`${chain} is not yet supported`));
 };

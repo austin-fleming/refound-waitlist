@@ -1,8 +1,9 @@
+import type { Nullable } from "@utils/types/nullable";
 import { isDate } from "@utils/validation/is-date";
 import { isNullish } from "@utils/validation/is-nullish";
 import { isUuidV4 } from "@utils/validation/is-uuidv4";
 import { accountEmail } from "./account-email";
-import { AccountId } from "./account-id";
+import type { AccountId } from "./account-id";
 
 export type Account = {
 	id: AccountId;
@@ -16,12 +17,12 @@ export type Account = {
 		chain: string;
 		chainId?: number;
 	};
-	createdAt: Date;
-	updatedAt: Date;
+	createdAt: string;
+	updatedAt: string;
 };
 
-export const validate = (account: Account) => {
-	let validationErrors: string[] = [];
+export const validate = (account: Account): Nullable<Error> => {
+	const validationErrors: string[] = [];
 
 	// id
 	if (!isUuidV4(account.id)) {
@@ -64,12 +65,16 @@ export const validate = (account: Account) => {
 	}
 
 	// createdAt
-	if (!isDate(account.createdAt)) {
+	if (!isDate(new Date(account.createdAt))) {
 		validationErrors.push("'Created At' is not a valid Date");
 	}
 
 	// updatedAt
-	if (!isDate(account.updatedAt)) {
+	if (!isDate(new Date(account.updatedAt))) {
 		validationErrors.push("'Updated At' is not a valid Date");
 	}
+
+	if (validationErrors.length > 0) return new Error(validationErrors.join("; "));
+
+	return null;
 };

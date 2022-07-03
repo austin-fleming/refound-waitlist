@@ -1,7 +1,6 @@
-// Next.js API route support: https://nextjs.org/docs/api-routes/introduction
-import { isString } from "@utils/validation/is-string";
 import type { NextApiRequest, NextApiResponse } from "next";
-import { Account } from "../domain/account";
+import type { Account } from "../domain/account";
+import { isString } from "@utils/validation/is-string";
 import { accountRepoSupabase } from "../repos/implementation/account.repo.supabase";
 
 type Data = {

@@ -1,7 +1,8 @@
 import { Profile } from "@modules/account/domain/profile";
 import { request } from "@utils/request";
-import { NextPage } from "next";
-import { SyntheticEvent, useState } from "react";
+import type { NextPage } from "next";
+import type { SyntheticEvent } from "react";
+import { useState } from "react";
 
 const JoinPage: NextPage = () => {
 	const [desiredHandle, setDesiredHandle] = useState("");

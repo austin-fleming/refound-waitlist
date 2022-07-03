@@ -23,6 +23,9 @@
       "@db/*": [
         "db/*"
       ],
+      "@components/*": [
+        "components/*"
+      ],
       "@styles/*": [
         "styles/*"
       ],
@@ -38,7 +41,8 @@
     "next-env.d.ts",
     "**/*.ts",
     "**/*.tsx",
-    ".eslintrc.js"
+    ".eslintrc.js",
+    "tailwind.config.js"
   ],
   "exclude": [
     "node_modules"

@@ -1,0 +1,7 @@
+.accountDetail {
+	@apply flex flex-col gap-2;
+}
+
+.accountDetail_label {
+	@apply text-sm text-primary-less;
+}

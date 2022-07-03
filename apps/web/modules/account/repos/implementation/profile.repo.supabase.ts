@@ -1,11 +1,14 @@
 import { supabaseClient } from "@db/supabase/supabase.client";
-import { Profile } from "@modules/account/domain/profile";
-import { ProfileDSO } from "@modules/account/dso/profile.dso";
+import type { Account } from "@modules/account/domain/account";
+import type { Profile } from "@modules/account/domain/profile";
+import type { ProfileDSO } from "@modules/account/dso/profile.dso";
 import { profileMapper } from "@modules/account/mapper/profile.mapper";
 import { pgErrorToApiError } from "@modules/common/error-handling/pgErrorToApiError";
-import { SupabaseClient } from "@supabase/supabase-js";
-import { fail, ok, Result } from "@utils/monads/result.monad";
-import { ProfileRepo } from "../profile.repo";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Result } from "@utils/monads/result.monad";
+import { fail, ok } from "@utils/monads/result.monad";
+import type { Nullable } from "@utils/types/nullable";
+import type { ProfileRepo } from "../profile.repo";
 
 const makeProfileRepoSupabase = (supabaseClient: SupabaseClient): ProfileRepo => {
 	const exists = async (id: Profile["id"]): Promise<Result<boolean>> => {
@@ -66,6 +69,22 @@ const makeProfileRepoSupabase = (supabaseClient: SupabaseClient): ProfileRepo =>
 		return profileMapper.dsoToDomain(data);
 	};
 
+	const getByAccountReference = async (
+		accountId: Account["id"],
+	): Promise<Result<Nullable<Profile>>> => {
+		const { data, error } = await supabaseClient
+			.from<ProfileDSO>("account_profile")
+			.select("*")
+			.eq("account_id", accountId);
+
+		if (error) return fail(pgErrorToApiError(error));
+		if (!data?.[0]?.id) {
+			return ok(null);
+		}
+
+		return profileMapper.dsoToDomain(data[0]);
+	};
+
 	const add = async (profile: Profile): Promise<Result<Profile>> => {
 		const result = profileMapper.domainToDso(profile);
 		if (result.isFail()) {
@@ -124,6 +143,7 @@ const makeProfileRepoSupabase = (supabaseClient: SupabaseClient): ProfileRepo =>
 		getById,
 		add,
 		update,
+		getByAccountReference,
 	};
 };
 

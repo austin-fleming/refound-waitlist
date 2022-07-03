@@ -1,9 +1,11 @@
+import LoginView from "components/login/Login/Login";
 import type { NextPage } from "next";
 import { useState } from "react";
 import { useWeb3Auth } from "services/web3auth/context/web3-auth.context";
 
 const LoginPage: NextPage = () => {
-	const { login, logout, getUserInfo, getAccounts, provider, chain, network } = useWeb3Auth();
+	return <LoginView />;
+	/* const { login, logout, getUserInfo, getAccounts, provider, chain, network } = useWeb3Auth();
 	const [details, setDetails] = useState("");
 	const [accounts, setAccounts] = useState("");
 
@@ -53,7 +55,7 @@ const LoginPage: NextPage = () => {
 				)}
 			</section>
 		</main>
-	);
+	); */
 };
 
 export default LoginPage;

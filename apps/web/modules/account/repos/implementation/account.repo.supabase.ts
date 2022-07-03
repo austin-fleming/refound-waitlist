@@ -1,11 +1,13 @@
-import { PostgrestError, SupabaseClient } from "@supabase/supabase-js";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Account } from "@modules/account/domain/account";
+import type { AccountDSO } from "@modules/account/dso/account.dso";
+import type { Result } from "@utils/monads/result.monad";
+import type { AccountRepo } from "../account.repo";
 import { supabaseClient } from "@db/supabase/supabase.client";
-import { Account } from "@modules/account/domain/account";
-import { AccountDSO } from "@modules/account/dso/account.dso";
 import { accountMapper } from "@modules/account/mapper/account.mapper";
 import { pgErrorToApiError } from "@modules/common/error-handling/pgErrorToApiError";
-import { fail, ok, Result } from "@utils/monads/result.monad";
-import { AccountRepo } from "../account.repo";
+import { fail, ok } from "@utils/monads/result.monad";
+import type { Nullable } from "@utils/types/nullable";
 
 const makeAccountRepoSupabase = (supabaseClient: SupabaseClient): AccountRepo => {
 	const exists = async (id: Account["id"]): Promise<Result<boolean>> => {
@@ -19,6 +21,20 @@ const makeAccountRepoSupabase = (supabaseClient: SupabaseClient): AccountRepo =>
 		if (error) return fail(Error("Failed to check if account exists."));
 
 		return ok(Boolean(data?.id));
+	};
+
+	const walletAddressExists = async (
+		walletAddress: Account["wallet"]["address"],
+	): Promise<Result<boolean>> => {
+		const { data, error } = await supabaseClient
+			.from<Pick<AccountDSO, "wallet_address">>("account")
+			.select("wallet_address")
+			.eq("wallet_address", walletAddress);
+
+		if (error) return fail(pgErrorToApiError(error));
+
+		const didFindAddress = data.length > 0;
+		return ok(didFindAddress);
 	};
 
 	const get = async (id: Account["id"]): Promise<Result<Account>> => {
@@ -40,6 +56,29 @@ const makeAccountRepoSupabase = (supabaseClient: SupabaseClient): AccountRepo =>
 		return ok(account);
 	};
 
+	const getByWalletAddress = async (
+		address: Account["wallet"]["address"],
+	): Promise<Result<Nullable<Account>>> => {
+		const { data, error } = await supabaseClient
+			.from<AccountDSO>("account")
+			.select("*")
+			.eq("wallet_address", address);
+
+		// TODO: it's unsafe to return this error
+		if (error) return fail(pgErrorToApiError(error));
+
+		const maybeAccount = data?.[0];
+
+		if (!maybeAccount?.id) {
+			return ok(null);
+		}
+
+		// TODO: should be returning option
+		const account = accountMapper.dsoToDomain(maybeAccount);
+
+		return ok(account);
+	};
+
 	const add = async (account: Account): Promise<Result<Account>> => {
 		// TODO: should return option
 		const dso = accountMapper.domainToDso(account);
@@ -49,7 +88,10 @@ const makeAccountRepoSupabase = (supabaseClient: SupabaseClient): AccountRepo =>
 			.insert(dso)
 			.single();
 
-		if (error) return fail(Error("Could not add account to accountRepoSupabase."));
+		if (error) {
+			console.error(error);
+			return fail(Error("Could not add account to accountRepoSupabase."));
+		}
 
 		if (!storedDso?.id) return fail(Error("Does not appear account was added."));
 
@@ -80,7 +122,9 @@ const makeAccountRepoSupabase = (supabaseClient: SupabaseClient): AccountRepo =>
 
 	return {
 		exists,
+		walletAddressExists,
 		get,
+		getByWalletAddress,
 		add,
 		update,
 	};

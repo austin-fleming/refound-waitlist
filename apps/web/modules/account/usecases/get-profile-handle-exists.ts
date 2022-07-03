@@ -4,14 +4,14 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { Profile } from "../domain/profile";
 import { profileRepoSupabase } from "../repos/implementation/profile.repo.supabase";
 
-type Data = {
+export type GetProfileHandleExistsResponse = {
 	detail?: string;
 	exists?: boolean;
 };
 
 export default async function getProfileHandleExists(
 	request: NextApiRequest,
-	response: NextApiResponse<Data>,
+	response: NextApiResponse<GetProfileHandleExistsResponse>,
 ) {
 	const { handle } = request.query;
 
@@ -24,6 +24,6 @@ export default async function getProfileHandleExists(
 	// TODO: code should come from error
 	return result.match({
 		ok: (exists) => response.status(200).json({ exists }),
-		fail: (err) => response.status(500).json({ detail: `${err}` }),
+		fail: (err) => response.status(500).json({ detail: err.message }),
 	});
 }
