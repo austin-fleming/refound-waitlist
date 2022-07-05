@@ -4,10 +4,11 @@
   "main": "index.js",
   "license": "MIT",
   "private": true,
-   "workspaces": [
-     "apps/*"
-   ],
-   "scripts": {
-     "web": "yarn workspace @apps/web"
-   }
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "web": "yarn workspace @apps/web",
+    "server": "yarn workspace @apps/server"
+  }
 }
